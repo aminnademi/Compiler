@@ -8,7 +8,7 @@ class Scanner:
     The scanner keeps the symbol table inside itself so it can be reused later
     by the parser or by a bigger compiler file without duplicated logic.
     """
-    KEYWORDS = ["if", "else", "void", "int", "repeat", "break", "until", "return"]
+    KEYWORDS = ["break", "else", "if", "int", "repeat", "return", "until", "void"]
     KEYWORD_SET = set(KEYWORDS)
 
     SYMBOLS = {
