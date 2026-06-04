@@ -3,6 +3,11 @@ from typing import Optional, List, Tuple, Dict
 
 
 class Scanner:
+    """"
+    Core language pieces: keywords, symbols, and whitespace.
+    The scanner keeps the symbol table inside itself so it can be reused later
+    by the parser or by a bigger compiler file without duplicated logic.
+    """
     KEYWORDS = ["if", "else", "void", "int", "repeat", "break", "until", "return"]
     KEYWORD_SET = set(KEYWORDS)
 
@@ -27,7 +32,7 @@ class Scanner:
         self.symbol_set = set(self.KEYWORDS)
 
     """
-    Small input helpers: one character lookahead, one-character advance, 
+    Small input helpers: one character lookahead, one-character advance,
     and a few utility checks for readability.
     """
     def _peek(self) -> Optional[str]:
@@ -38,13 +43,10 @@ class Scanner:
     def _advance(self) -> Optional[str]:
         if self.index >= len(self.source):
             return None
-
         ch = self.source[self.index]
         self.index += 1
-
         if ch == "\n":
             self.line += 1
-
         return ch
 
     def _current_char(self) -> Optional[str]:
@@ -60,7 +62,7 @@ class Scanner:
 
     def _is_alnum(self, ch: str) -> bool:
         return ch.isalnum()
-    
+
     def _add_token(self, line_no: int, token_type: str, token_lexeme: str) -> None:
         if line_no not in self.tokens_by_line:
             self.tokens_by_line[line_no] = []
@@ -80,7 +82,6 @@ class Scanner:
     and reports lexical errors in panic style so scanning can continue.
     When the input ends, it returns the special EOF token "$".
     """
-
     def get_next_token(self) -> Tuple[str, str, int]:
         if self.eof_reached:
             return "$", "$", self.line
@@ -183,8 +184,60 @@ class Scanner:
         self.eof_reached = True
         return "$", "$", self.line
 
+    # Runs the scanner over the whole file and stores tokens grouped by line.
+    def scan_all(self) -> None:
+        while True:
+            token_type, token_lexeme, token_line = self.get_next_token()
+            if token_type == "$":
+                break
+            self._add_token(token_line, token_type, token_lexeme)
+
+    # Pretty ASCII table writer used for all three output files.
+    def _render_table(self, headers: List[str], rows: List[List[str]]) -> str:
+        widths = [len(h) for h in headers]
+        for row in rows:
+            for i, cell in enumerate(row):
+                widths[i] = max(widths[i], len(cell))
+
+        border = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
+        header = "| " + " | ".join(headers[i].center(widths[i]) for i in range(len(headers))) + " |"
+
+        lines = [border, header, border]
+        for row in rows:
+            lines.append("| " + " | ".join(row[i].ljust(widths[i]) for i in range(len(row))) + " |")
+            lines.append(border)
+
+        return "\n".join(lines) + "\n"
+
+    def write_outputs(self, out_dir: str) -> None:
+        tokens_path = os.path.join(out_dir, "tokens.txt")
+        errors_path = os.path.join(out_dir, "lexical_errors.txt")
+        symbols_path = os.path.join(out_dir, "symbol_table.txt")
+
+        # tokens.txt: grouped by line number, with a clean table layout.
+        token_rows = []
+        for line_no in sorted(self.tokens_by_line):
+            parts = " ".join(f'({ttype}, "{lexeme}")' for ttype, lexeme in self.tokens_by_line[line_no])
+            token_rows.append([str(line_no), parts])
+
+        with open(tokens_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(self._render_table(["lineno", "Recognized Tokens"], token_rows))
+
+        # lexical_errors.txt: either a short no-error message or the same table style.
+        with open(errors_path, "w", encoding="utf-8", newline="\n") as f:
+            if not self.errors:
+                f.write("There is no lexical error.\n")
+            else:
+                error_rows = [[str(line_no), f'({thrown}, {message})'] for line_no, thrown, message in self.errors]
+                f.write(self._render_table(["lineno", "Error Message"], error_rows))
+
+        # symbol_table.txt: keywords first, then identifiers in first-seen order.
+        symbol_rows = [[str(i + 1), lexeme] for i, lexeme in enumerate(self.symbol_table)]
+        with open(symbols_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(self._render_table(["no", "lexeme"], symbol_rows))
+
+
 def main() -> None:
-    # The scanner reads input.txt from the same folder as this script.
     base_dir = os.path.dirname(os.path.abspath(__file__))
     input_path = os.path.join(base_dir, "input.txt")
 
@@ -196,3 +249,9 @@ def main() -> None:
         return
 
     scanner = Scanner(source)
+    scanner.scan_all()
+    scanner.write_outputs(base_dir)
+
+
+if __name__ == "__main__":
+    main()
