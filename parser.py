@@ -175,3 +175,54 @@ class Parser:
             self.sync(sync_set)
 
         return False
+
+
+def render_tree(root: TreeNode) -> str:
+    lines: List[str] = []
+
+    def walk(node: TreeNode, prefix: str = "", is_last: bool = True, is_root: bool = False) -> None:
+        if is_root:
+            lines.append(node.label)
+        else:
+            branch = "└── " if is_last else "├── "
+            lines.append(prefix + branch + node.label)
+
+        if node.children:
+            next_prefix = prefix + ("    " if is_last else "│   ")
+            for i, child in enumerate(node.children):
+                walk(child, next_prefix, i == len(node.children) - 1, False)
+
+    walk(root, is_root=True)
+    return "\n".join(lines) + "\n"
+
+
+def main() -> None:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    input_path = os.path.join(base_dir, "input.txt")
+
+    try:
+        with open(input_path, "r", encoding="utf-8", newline="") as f:
+            source = f.read()
+    except OSError:
+        print("input.txt was not found.")
+        return
+
+    scanner = Scanner(source)
+    parser = Parser(scanner)
+    root = parser.parse()
+
+    parse_tree_path = os.path.join(base_dir, "parse_tree.txt")
+    syntax_errors_path = os.path.join(base_dir, "syntax_errors.txt")
+
+    with open(parse_tree_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(render_tree(root))
+
+    with open(syntax_errors_path, "w", encoding="utf-8", newline="\n") as f:
+        if parser.errors:
+            f.write("\n".join(parser.errors) + "\n")
+        else:
+            f.write("There is no syntax error.\n")
+
+
+if __name__ == "__main__":
+    main()
