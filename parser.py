@@ -417,6 +417,266 @@ class Parser:
             self.sync(FOLLOW["Expression"])
         return node
 
+    def parse_B(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("B"))
+        if self.sym() == "=":
+            self.match("=", node, FOLLOW["B"])
+            self.parse_expression(node)
+        elif self.sym() == "[":
+            self.match("[", node, FOLLOW["B"])
+            self.parse_expression(node)
+            self.match("]", node, FOLLOW["B"])
+            self.parse_H(node)
+        else:
+            self.parse_simple_expression_prime(node)
+        return node
+
+    def parse_H(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("H"))
+        if self.sym() == "=":
+            self.match("=", node, FOLLOW["H"])
+            self.parse_expression(node)
+        else:
+            self.parse_G(node)
+            self.parse_D(node)
+            self.parse_C(node)
+        return node
+
+    def parse_simple_expression_zegond(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Simple-expression-zegond"))
+        self.parse_additive_expression_zegond(node)
+        self.parse_C(node)
+        return node
+
+    def parse_simple_expression_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Simple-expression-prime"))
+        self.parse_additive_expression_prime(node)
+        self.parse_C(node)
+        return node
+
+    def parse_C(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("C"))
+        if self.sym() in {"<", "=="}:
+            self.parse_Relop(node)
+            self.parse_additive_expression(node)
+        elif self.sym() in FOLLOW["C"]:
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["C"])
+            node.add(TreeNode(EPS))
+        return node
+
+    def parse_Relop(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Relop"))
+        if self.sym() in {"<", "=="}:
+            self.match(self.sym(), node, FOLLOW["Relop"])
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Relop"])
+        return node
+
+    def parse_additive_expression(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Additive-expression"))
+        self.parse_term(node)
+        self.parse_D(node)
+        return node
+
+    def parse_additive_expression_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Additive-expression-prime"))
+        self.parse_term_prime(node)
+        self.parse_D(node)
+        return node
+
+    def parse_additive_expression_zegond(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Additive-expression-zegond"))
+        self.parse_term_zegond(node)
+        self.parse_D(node)
+        return node
+
+    def parse_D(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("D"))
+        if self.sym() in {"+", "-"}:
+            self.parse_Addo(node)
+            self.parse_term(node)
+            self.parse_D(node)
+        elif self.sym() in FOLLOW["D"]:
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["D"])
+            node.add(TreeNode(EPS))
+        return node
+
+    def parse_Addo(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Addo"))
+        if self.sym() in {"+", "-"}:
+            self.match(self.sym(), node, FOLLOW["Addo"])
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Addo"])
+        return node
+
+    def parse_term(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Term"))
+        self.parse_factor(node)
+        self.parse_G(node)
+        return node
+
+    def parse_term_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Term-prime"))
+        self.parse_factor_prime(node)
+        self.parse_G(node)
+        return node
+
+    def parse_term_zegond(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Term-zegond"))
+        self.parse_factor_zegond(node)
+        self.parse_G(node)
+        return node
+
+    def parse_G(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("G"))
+        if self.sym() == "*":
+            self.match("*", node, FOLLOW["G"])
+            self.parse_factor(node)
+            self.parse_G(node)
+        elif self.sym() in FOLLOW["G"]:
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["G"])
+            node.add(TreeNode(EPS))
+        return node
+
+    def parse_factor(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Factor"))
+        if self.sym() == "(":
+            self.match("(", node, FOLLOW["Factor"])
+            self.parse_expression(node)
+            self.match(")", node, FOLLOW["Factor"])
+        elif self.sym() == "ID":
+            self.match("ID", node, FOLLOW["Factor"])
+            self.parse_var_call_prime(node)
+        elif self.sym() == "NUM":
+            self.match("NUM", node, FOLLOW["Factor"])
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Factor"])
+        return node
+
+    def parse_var_call_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Var-call-prime"))
+        if self.sym() == "(":
+            self.match("(", node, FOLLOW["Var-call-prime"])
+            self.parse_args(node)
+            self.match(")", node, FOLLOW["Var-call-prime"])
+        else:
+            self.parse_var_prime(node)
+        return node
+
+    def parse_var_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Var-prime"))
+        if self.sym() == "[":
+            self.match("[", node, FOLLOW["Var-prime"])
+            self.parse_expression(node)
+            self.match("]", node, FOLLOW["Var-prime"])
+        elif self.sym() in FOLLOW["Var-prime"]:
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Var-prime"])
+            node.add(TreeNode(EPS))
+        return node
+
+    def parse_factor_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Factor-prime"))
+        if self.sym() == "(":
+            self.match("(", node, FOLLOW["Factor-prime"])
+            self.parse_args(node)
+            self.match(")", node, FOLLOW["Factor-prime"])
+        elif self.sym() in FOLLOW["Factor-prime"]:
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Factor-prime"])
+            node.add(TreeNode(EPS))
+        return node
+
+    def parse_factor_zegond(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Factor-zegond"))
+        if self.sym() == "(":
+            self.match("(", node, FOLLOW["Factor-zegond"])
+            self.parse_expression(node)
+            self.match(")", node, FOLLOW["Factor-zegond"])
+        elif self.sym() == "NUM":
+            self.match("NUM", node, FOLLOW["Factor-zegond"])
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Factor-zegond"])
+        return node
+
+    def parse_args(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Args"))
+        if self.sym() in {"ID", "NUM", "("}:
+            self.parse_arg_list(node)
+        elif self.sym() in FOLLOW["Args"]:
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Args"])
+            node.add(TreeNode(EPS))
+        return node
+
+    def parse_arg_list(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Arg-list"))
+        if self.sym() in {"ID", "NUM", "("}:
+            self.parse_expression(node)
+            self.parse_arg_list_prime(node)
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Arg-list"])
+        return node
+
+    def parse_arg_list_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Arg-list-prime"))
+        if self.sym() == ",":
+            self.match(",", node, FOLLOW["Arg-list-prime"])
+            self.parse_expression(node)
+            self.parse_arg_list_prime(node)
+        elif self.sym() in FOLLOW["Arg-list-prime"]:
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Arg-list-prime"])
+            node.add(TreeNode(EPS))
+        return node
+
+
 def render_tree(root: TreeNode) -> str:
     lines: List[str] = []
 
