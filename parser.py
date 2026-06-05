@@ -208,6 +208,43 @@ class Parser:
         self.match("ID", node, FOLLOW["Declaration-initial"])
         return node
 
+    def parse_declaration_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Declaration-prime"))
+        if self.sym() == "{":
+            self.parse_fun_declaration_prime(node)
+        elif self.sym() in {";", "["}:
+            self.parse_var_declaration_prime(node)
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Declaration-prime"])
+        return node
+
+    def parse_var_declaration_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Var-declaration-prime"))
+        if self.sym() == ";":
+            self.match(";", node, FOLLOW["Var-declaration-prime"])
+        elif self.sym() == "[":
+            self.match("[", node, FOLLOW["Var-declaration-prime"])
+            self.match("NUM", node, FOLLOW["Var-declaration-prime"])
+            self.match("]", node, FOLLOW["Var-declaration-prime"])
+            self.match(";", node, FOLLOW["Var-declaration-prime"])
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Var-declaration-prime"])
+        return node
+
+    def parse_fun_declaration_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Fun-declaration-prime"))
+        self.match("{", node, FOLLOW["Fun-declaration-prime"])
+        self.parse_params(node)
+        self.match("}", node, FOLLOW["Fun-declaration-prime"])
+        self.parse_compound_stmt(node)
+        return node
+
     def parse_type_specifier(self, parent: TreeNode) -> TreeNode:
         node = parent.add(TreeNode("Type-specifier"))
         if self.sym() in {"int", "void"}:
@@ -217,6 +254,59 @@ class Parser:
                 self.report_error()
                 self.in_panic = True
             self.sync(FOLLOW["Type-specifier"])
+        return node
+
+    def parse_params(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Params"))
+        if self.sym() == "int":
+            self.match("int", node, FOLLOW["Params"])
+            self.match("ID", node, FOLLOW["Params"])
+            self.parse_param_prime(node)
+            self.parse_param_list(node)
+        elif self.sym() == "void":
+            self.match("void", node, FOLLOW["Params"])
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Params"])
+        return node
+
+    def parse_param_list(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Param-list"))
+        if self.sym() == ",":
+            self.match(",", node, FOLLOW["Param-list"])
+            self.parse_param(node)
+            self.parse_param_list(node)
+        elif self.sym() in FOLLOW["Param-list"]:
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Param-list"])
+            node.add(TreeNode(EPS))
+        return node
+
+    def parse_param(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Param"))
+        self.parse_declaration_initial(node)
+        self.parse_param_prime(node)
+        return node
+
+    def parse_param_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Param-prime"))
+        if self.sym() == "[":
+            self.match("[", node, FOLLOW["Param-prime"])
+            self.match("]", node, FOLLOW["Param-prime"])
+        elif self.sym() in FOLLOW["Param-prime"]:
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Param-prime"])
+            node.add(TreeNode(EPS))
         return node
 
 def render_tree(root: TreeNode) -> str:
