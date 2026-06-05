@@ -309,6 +309,114 @@ class Parser:
             node.add(TreeNode(EPS))
         return node
 
+    def parse_compound_stmt(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Compound-stmt"))
+        self.match("{", node, FOLLOW["Compound-stmt"])
+        self.parse_declaration_list(node)
+        self.parse_statement_list(node)
+        self.match("}", node, FOLLOW["Compound-stmt"])
+        return node
+
+    def parse_statement_list(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Statement-list"))
+        if self.sym() in {"if", "{", "repeat", "break", "return", "ID", "NUM", "("}:
+            self.parse_statement(node)
+            self.parse_statement_list(node)
+        elif self.sym() in FOLLOW["Statement-list"]:
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Statement-list"])
+            node.add(TreeNode(EPS))
+        return node
+
+    def parse_statement(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Statement"))
+        if self.sym() == "{":
+            self.parse_compound_stmt(node)
+        elif self.sym() == "if":
+            self.parse_selection_stmt(node)
+        elif self.sym() == "repeat":
+            self.parse_iteration_stmt(node)
+        elif self.sym() == "return":
+            self.parse_return_stmt(node)
+        elif self.sym() == "break" or self.sym() in {"ID", "NUM", "("}:
+            self.parse_expression_stmt(node)
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Statement"])
+        return node
+
+    def parse_expression_stmt(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Expression-stmt"))
+        if self.sym() == "break":
+            self.match("break", node, FOLLOW["Expression-stmt"])
+            self.match(";", node, FOLLOW["Expression-stmt"])
+            self.match(";", node, FOLLOW["Expression-stmt"])
+        else:
+            self.parse_expression(node)
+            self.match(";", node, FOLLOW["Expression-stmt"])
+        return node
+
+    def parse_selection_stmt(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Selection-stmt"))
+        self.match("if", node, FOLLOW["Selection-stmt"])
+        self.match("(", node, FOLLOW["Selection-stmt"])
+        self.parse_expression(node)
+        self.match(")", node, FOLLOW["Selection-stmt"])
+        self.parse_statement(node)
+        self.match("else", node, FOLLOW["Selection-stmt"])
+        self.parse_statement(node)
+        return node
+
+    def parse_iteration_stmt(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Iteration-stmt"))
+        self.match("repeat", node, FOLLOW["Iteration-stmt"])
+        self.parse_statement(node)
+        self.match("until", node, FOLLOW["Iteration-stmt"])
+        self.match("(", node, FOLLOW["Iteration-stmt"])
+        self.parse_expression(node)
+        self.match(")", node, FOLLOW["Iteration-stmt"])
+        return node
+
+    def parse_return_stmt(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Return-stmt"))
+        self.match("return", node, FOLLOW["Return-stmt"])
+        self.parse_return_stmt_prime(node)
+        return node
+
+    def parse_return_stmt_prime(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Return-stmt-prime"))
+        if self.sym() == ";":
+            self.match(";", node, FOLLOW["Return-stmt-prime"])
+        elif self.sym() in {"ID", "NUM", "("}:
+            self.parse_expression(node)
+            self.match(";", node, FOLLOW["Return-stmt-prime"])
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Return-stmt-prime"])
+        return node
+
+    def parse_expression(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Expression"))
+        if self.sym() in {"NUM", "("}:
+            self.parse_simple_expression_zegond(node)
+        elif self.sym() == "ID":
+            self.match("ID", node, FOLLOW["Expression"])
+            self.parse_B(node)
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Expression"])
+        return node
+
 def render_tree(root: TreeNode) -> str:
     lines: List[str] = []
 
