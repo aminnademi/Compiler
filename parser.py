@@ -176,6 +176,48 @@ class Parser:
 
         return False
 
+    def parse(self) -> TreeNode:
+        root = TreeNode("Program")
+        self.parse_declaration_list(root)
+        return root
+
+    def parse_declaration_list(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Declaration-list"))
+        if self.sym() in {"int", "void"}:
+            self.parse_declaration(node)
+            self.parse_declaration_list(node)
+        elif self.sym() in FOLLOW["Declaration-list"] or self.sym() == "$":
+            node.add(TreeNode(EPS))
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Declaration-list"])
+            node.add(TreeNode(EPS))
+        return node
+
+    def parse_declaration(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Declaration"))
+        self.parse_declaration_initial(node)
+        self.parse_declaration_prime(node)
+        return node
+
+    def parse_declaration_initial(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Declaration-initial"))
+        self.parse_type_specifier(node)
+        self.match("ID", node, FOLLOW["Declaration-initial"])
+        return node
+
+    def parse_type_specifier(self, parent: TreeNode) -> TreeNode:
+        node = parent.add(TreeNode("Type-specifier"))
+        if self.sym() in {"int", "void"}:
+            self.match(self.sym(), node, FOLLOW["Type-specifier"])
+        else:
+            if not self.in_panic:
+                self.report_error()
+                self.in_panic = True
+            self.sync(FOLLOW["Type-specifier"])
+        return node
 
 def render_tree(root: TreeNode) -> str:
     lines: List[str] = []
