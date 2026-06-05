@@ -192,50 +192,50 @@ class Scanner:
                 break
             self._add_token(token_line, token_type, token_lexeme)
 
-    # Pretty ASCII table writer used for all three output files.
-    def _render_table(self, headers: List[str], rows: List[List[str]]) -> str:
-        widths = [len(h) for h in headers]
-        for row in rows:
-            for i, cell in enumerate(row):
-                widths[i] = max(widths[i], len(cell))
 
-        border = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
-        header = "| " + " | ".join(headers[i].center(widths[i]) for i in range(len(headers))) + " |"
+# Pretty ASCII table writer used for all three output files.
+def render_table(headers: List[str], rows: List[List[str]]) -> str:
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(cell))
 
-        lines = [border, header, border]
-        for row in rows:
-            lines.append("| " + " | ".join(row[i].ljust(widths[i]) for i in range(len(row))) + " |")
-            lines.append(border)
+    border = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
+    header = "| " + " | ".join(headers[i].center(widths[i]) for i in range(len(headers))) + " |"
 
-        return "\n".join(lines) + "\n"
+    lines = [border, header, border]
+    for row in rows:
+        lines.append("| " + " | ".join(row[i].ljust(widths[i]) for i in range(len(row))) + " |")
+        lines.append(border)
 
-    def write_outputs(self, out_dir: str) -> None:
-        tokens_path = os.path.join(out_dir, "tokens.txt")
-        errors_path = os.path.join(out_dir, "lexical_errors.txt")
-        symbols_path = os.path.join(out_dir, "symbol_table.txt")
+    return "\n".join(lines) + "\n"
 
-        # tokens.txt: grouped by line number, with a clean table layout.
-        token_rows = []
-        for line_no in sorted(self.tokens_by_line):
-            parts = " ".join(f'({ttype}, "{lexeme}")' for ttype, lexeme in self.tokens_by_line[line_no])
-            token_rows.append([str(line_no), parts])
+def write_scanner_outputs(scanner: Scanner, out_dir: str) -> None:
+    tokens_path = os.path.join(out_dir, "tokens.txt")
+    errors_path = os.path.join(out_dir, "lexical_errors.txt")
+    symbols_path = os.path.join(out_dir, "symbol_table.txt")
 
-        with open(tokens_path, "w", encoding="utf-8", newline="\n") as f:
-            f.write(self._render_table(["lineno", "Recognized Tokens"], token_rows))
+    # tokens.txt: grouped by line number
+    token_rows = []
+    for line_no in sorted(scanner.tokens_by_line):
+        parts = " ".join(f'({ttype}, "{lexeme}")' for ttype, lexeme in scanner.tokens_by_line[line_no])
+        token_rows.append([str(line_no), parts])
 
-        # lexical_errors.txt: either a short no-error message or the same table style.
-        with open(errors_path, "w", encoding="utf-8", newline="\n") as f:
-            if not self.errors:
-                f.write("There is no lexical error.\n")
-            else:
-                error_rows = [[str(line_no), f'({thrown}, {message})'] for line_no, thrown, message in self.errors]
-                f.write(self._render_table(["lineno", "Error Message"], error_rows))
+    with open(tokens_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(render_table(["lineno", "Recognized Tokens"], token_rows))
 
-        # symbol_table.txt: keywords first, then identifiers in first-seen order.
-        symbol_rows = [[str(i + 1), lexeme] for i, lexeme in enumerate(self.symbol_table)]
-        with open(symbols_path, "w", encoding="utf-8", newline="\n") as f:
-            f.write(self._render_table(["no", "lexeme"], symbol_rows))
+    # lexical_errors.txt
+    with open(errors_path, "w", encoding="utf-8", newline="\n") as f:
+        if not scanner.errors:
+            f.write("There is no lexical error.\n")
+        else:
+            error_rows = [[str(line_no), f'({thrown}, {message})'] for line_no, thrown, message in scanner.errors]
+            f.write(render_table(["lineno", "Error Message"], error_rows))
 
+    # symbol_table.txt
+    symbol_rows = [[str(i + 1), lexeme] for i, lexeme in enumerate(scanner.symbol_table)]
+    with open(symbols_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(render_table(["no", "lexeme"], symbol_rows))
 
 def main() -> None:
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -250,8 +250,7 @@ def main() -> None:
 
     scanner = Scanner(source)
     scanner.scan_all()
-    scanner.write_outputs(base_dir)
-
+    write_scanner_outputs(scanner, base_dir)
 
 if __name__ == "__main__":
     main()

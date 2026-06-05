@@ -143,6 +143,7 @@ class Parser:
         self.current_type, self.current_lexeme, self.current_line = self._next_token()
         self.errors: List[str] = []
         self.in_panic = False  # flag to avoid cascading error messages
+        self.root = None
 
     def _next_token(self) -> Tuple[str, str, int]:
         token = self.scanner.get_next_token()
@@ -186,9 +187,9 @@ class Parser:
     # They follow the grammar structure and build the parse tree via parent nodes.
 
     def parse(self) -> TreeNode:
-        root = TreeNode("Program")
-        self.parse_declaration_list(root)
-        return root
+        self.root = TreeNode("Program")
+        self.parse_declaration_list(self.root)
+        return self.root
 
     def parse_declaration_list(self, parent: TreeNode) -> TreeNode:
         node = parent.add(TreeNode("Declaration-list"))
@@ -705,6 +706,24 @@ def render_tree(root: TreeNode) -> str:
     walk(root, is_root=True)
     return "\n".join(lines) + "\n"
 
+
+def write_parser_outputs(parser: Parser, out_dir: str) -> None:
+    parse_tree_path = os.path.join(out_dir, "parse_tree.txt")
+    syntax_errors_path = os.path.join(out_dir, "syntax_errors.txt")
+
+    # Parse tree
+    if parser.root is not None:
+        tree_str = render_tree(parser.root)
+        with open(parse_tree_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(tree_str)
+
+    # Syntax errors
+    with open(syntax_errors_path, "w", encoding="utf-8", newline="\n") as f:
+        if not parser.errors:
+            f.write("There is no syntax error.\n")
+        else:
+            f.write("\n".join(parser.errors) + "\n")
+            
 # --- Main Driver ---
 def main() -> None:
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -719,19 +738,8 @@ def main() -> None:
 
     scanner = Scanner(source)
     parser = Parser(scanner)
-    root = parser.parse()
-
-    parse_tree_path = os.path.join(base_dir, "parse_tree.txt")
-    syntax_errors_path = os.path.join(base_dir, "syntax_errors.txt")
-
-    with open(parse_tree_path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(render_tree(root))
-
-    with open(syntax_errors_path, "w", encoding="utf-8", newline="\n") as f:
-        if parser.errors:
-            f.write("\n".join(parser.errors) + "\n")
-        else:
-            f.write("There is no syntax error.\n")
+    parser.parse()
+    write_parser_outputs(parser, base_dir)
 
 if __name__ == "__main__":
     main()
